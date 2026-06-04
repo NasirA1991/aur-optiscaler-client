@@ -1,0 +1,77 @@
+name: Deploy to AUR
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Get latest version
+        id: latest
+        run: |
+          set -e
+
+          LATEST_VER=$(curl -s \
+            https://api.github.com/repos/Agustinm28/OptiScaler-Client/releases/latest \
+            | jq -r '.tag_name')
+
+          VERSION="${LATEST_VER#v}"
+
+          echo "latest=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Get current pkgver
+        id: current
+        run: |
+          CUR=$(grep '^pkgver=' PKGBUILD | cut -d= -f2)
+          echo "current=$CUR" >> $GITHUB_OUTPUT
+
+      - name: Compare versions
+        id: check
+        run: |
+          if [ "${{ steps.latest.outputs.latest }}" = "${{ steps.current.outputs.current }}" ]; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Update PKGBUILD
+        if: steps.check.outputs.skip == 'false'
+        run: |
+          sed -i \
+            "s/^pkgver=.*/pkgver=${{ steps.latest.outputs.latest }}/" \
+            PKGBUILD
+
+      - name: Regenerate .SRCINFO
+        if: steps.check.outputs.skip == 'false'
+        run: |
+          docker run --rm \
+            -v "$PWD:/pkg" \
+            archlinux:latest \
+            bash -c '
+              pacman -Sy --noconfirm base-devel >/dev/null
+              cd /pkg
+              makepkg --printsrcinfo > .SRCINFO
+            '
+
+      - name: Deploy to AUR
+        if: steps.check.outputs.skip == 'false'
+        uses: KSXGitHub/github-actions-deploy-aur@v3
+        with:
+          pkgname: optiscaler-client-bin
+          pkgbuild: ./PKGBUILD
+          assets: |
+            PKGBUILD
+            .SRCINFO
+            optiscaler-client.desktop
+          SSH_PRIVATE_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+          commit_username: ${{ secrets.AUR_COMMIT_USERNAME }}
+          commit_email: ${{ secrets.AUR_COMMIT_EMAIL }}
+          updpkgsums: false
+          allow_empty_commits: false
