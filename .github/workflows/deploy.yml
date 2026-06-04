@@ -31,13 +31,26 @@ jobs:
       - name: Get current pkgver
         id: current
         run: |
-          CUR=$(grep '^pkgver=' PKGBUILD | cut -d= -f2)
+          CUR=$(grep '^pkgver=' PKGBUILD | cut -d= -f2 || true)
           echo "current=$CUR" >> $GITHUB_OUTPUT
 
-      - name: Compare versions
+      - name: Compare versions (FIRST RUN SAFE)
         id: check
         run: |
-          if [ "${{ steps.latest.outputs.latest }}" = "${{ steps.current.outputs.current }}" ]; then
+          CUR="${{ steps.current.outputs.current }}"
+          LATEST="${{ steps.latest.outputs.latest }}"
+
+          echo "Current: $CUR"
+          echo "Latest: $LATEST"
+
+          # ALWAYS deploy if PKGBUILD has no version (first push case)
+          if [ -z "$CUR" ]; then
+            echo "skip=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # Normal comparison
+          if [ "$LATEST" = "$CUR" ]; then
             echo "skip=true" >> $GITHUB_OUTPUT
           else
             echo "skip=false" >> $GITHUB_OUTPUT
