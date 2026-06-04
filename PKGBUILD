@@ -17,6 +17,7 @@ options=(!strip)
 
 source=(
   "optiscaler-client.zip::https://github.com/Agustinm28/Optiscaler-Client/releases/download/OptiscalerClient-${pkgver}/OptiscalerClient-${pkgver}-linux-x64.zip"
+  "optiscaler-icon.png::https://raw.githubusercontent.com/Agustinm28/Optiscaler-Client/main/assets/icon.png"
   "optiscaler-client.desktop"
 )
 
@@ -39,9 +40,9 @@ EOF
   install -Dm644 optiscaler-client.desktop \
     "$pkgdir/usr/share/applications/optiscaler-client.desktop"
 
-  if [ -f "$pkgdir/opt/optiscaler-client/assets/icon.png" ]; then
-    install -Dm644 \
-      "$pkgdir/opt/optiscaler-client/assets/icon.png" \
-      "$pkgdir/usr/share/icons/hicolor/256x256/apps/optiscaler-client.png"
-  fi
+  install -Dm644 "optiscaler-icon.png" \
+    "$pkgdir/usr/share/icons/hicolor/256x256/apps/optiscaler-client.png"
+
+  install -Dm644 "optiscaler-icon.png" \
+    "$pkgdir/usr/share/icons/hicolor/128x128/apps/optiscaler-client.png"
 }
