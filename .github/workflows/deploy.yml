@@ -22,63 +22,29 @@ jobs:
             https://api.github.com/repos/Agustinm28/OptiScaler-Client/releases/latest \
             | jq -r '.tag_name')
 
-          # Extract clean version (ONLY numbers + dots)
+          # ONLY numbers + dots (important for AUR)
           VERSION=$(echo "$RAW_TAG" | grep -oE '[0-9]+(\.[0-9]+)*')
 
-          echo "raw=$RAW_TAG"
           echo "latest=$VERSION" >> $GITHUB_OUTPUT
 
-      - name: Get current pkgver
-        id: current
+      - name: Update PKGBUILD (always enforce clean version)
         run: |
-          CUR=$(grep '^pkgver=' PKGBUILD | cut -d= -f2 || true)
-          echo "current=$CUR" >> $GITHUB_OUTPUT
+          sed -i "s/^pkgver=.*/pkgver=${{ steps.latest.outputs.latest }}/" PKGBUILD
 
-      - name: Compare versions (FIRST RUN SAFE)
-        id: check
-        run: |
-          CUR="${{ steps.current.outputs.current }}"
-          LATEST="${{ steps.latest.outputs.latest }}"
-
-          echo "Current: $CUR"
-          echo "Latest: $LATEST"
-
-          # ALWAYS deploy if PKGBUILD has no version (first push case)
-          if [ -z "$CUR" ]; then
-            echo "skip=false" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-
-          # Normal comparison
-          if [ "$LATEST" = "$CUR" ]; then
-            echo "skip=true" >> $GITHUB_OUTPUT
-          else
-            echo "skip=false" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Update PKGBUILD
-        if: steps.check.outputs.skip == 'false'
-        run: |
-          sed -i \
-            "s/^pkgver=.*/pkgver=${{ steps.latest.outputs.latest }}/" \
-            PKGBUILD
-
-      - name: Generate .SRCINFO (Arch container safe)
-        if: steps.check.outputs.skip == 'false'
+      - name: Generate .SRCINFO (clean Arch method)
         run: |
           docker run --rm \
             -v "$PWD:/pkg" \
             -w /pkg \
             archlinux:latest \
             bash -c "
-              pacman -Sy --noconfirm base-devel >/dev/null &&
-              useradd builder &&
-              chown -R builder:builder /pkg &&
-              su builder -c 'makepkg --printsrcinfo > .SRCINFO'
+              pacman -Sy --noconfirm base-devel >/dev/null
+              useradd -m builder
+              chown -R builder:builder /pkg
+              su builder -c 'cd /pkg && makepkg --printsrcinfo > .SRCINFO'
             "
 
-      - name: Deploy to AUR
-        if: steps.check.outputs.skip == 'false'
+      - name: Deploy to AUR (ALWAYS)
         uses: KSXGitHub/github-actions-deploy-aur@v3
         with:
           pkgname: optiscaler-client-bin
@@ -91,4 +57,4 @@ jobs:
           commit_username: ${{ secrets.AUR_COMMIT_USERNAME }}
           commit_email: ${{ secrets.AUR_COMMIT_EMAIL }}
           updpkgsums: false
-          allow_empty_commits: false
+          allow_empty_commits: true
