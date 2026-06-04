@@ -47,15 +47,19 @@ jobs:
             "s/^pkgver=.*/pkgver=${{ steps.latest.outputs.latest }}/" \
             PKGBUILD
 
-      - name: Install build tools
+      - name: Generate .SRCINFO (Arch container safe)
         if: steps.check.outputs.skip == 'false'
         run: |
-          sudo pacman -Sy --noconfirm base-devel
-
-      - name: Generate .SRCINFO
-        if: steps.check.outputs.skip == 'false'
-        run: |
-          makepkg --printsrcinfo > .SRCINFO
+          docker run --rm \
+            -v "$PWD:/pkg" \
+            -w /pkg \
+            archlinux:latest \
+            bash -c "
+              pacman -Sy --noconfirm base-devel >/dev/null &&
+              useradd builder &&
+              chown -R builder:builder /pkg &&
+              su builder -c 'makepkg --printsrcinfo > .SRCINFO'
+            "
 
       - name: Deploy to AUR
         if: steps.check.outputs.skip == 'false'
