@@ -27,7 +27,7 @@ package() {
   mkdir -p "$pkgdir/opt/optiscaler-client"
   mkdir -p "$pkgdir/usr/bin"
 
-  bsdtar -xf optiscaler-client.tar.gz -C "$pkgdir/opt/optiscaler-client"
+  bsdtar -xf optiscaler-client.tar.gz -C "$pkgdir/opt/optiscaler-client" --strip-components=1
 
   install -Dm755 /dev/stdin "$pkgdir/usr/bin/optiscaler-client" << 'EOF'
 #!/bin/bash
