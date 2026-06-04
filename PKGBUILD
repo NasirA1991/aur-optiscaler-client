@@ -2,7 +2,7 @@
 
 pkgname=optiscaler-client-bin
 pkgver=1.0.5
-pkgrel=4
+pkgrel=3
 pkgdesc="Modern desktop client for installing, updating and configuring OptiScaler across game libraries"
 arch=('x86_64')
 url="https://github.com/Agustinm28/Optiscaler-Client"
@@ -28,35 +28,28 @@ package() {
   mkdir -p "$pkgdir/usr/bin"
   mkdir -p "$pkgdir/usr/share/pixmaps"
 
-  # Extract exactly as upstream provides
+  # extract app
   bsdtar -xf optiscaler-client.tar.gz -C "$pkgdir/opt/optiscaler-client" --strip-components=1
 
-  # FIXED launcher (NO cd, stable for .NET/Avalonia bundles)
+  # IMPORTANT FIX: correct working directory (Avalonia/.NET single-file apps need this)
   install -Dm755 /dev/stdin "$pkgdir/usr/bin/optiscaler-client" << 'EOF'
 #!/bin/bash
-exec /opt/optiscaler-client/OptiscalerClient "$@"
+cd /opt/optiscaler-client || exit 1
+exec ./OptiscalerClient "$@"
 EOF
 
-  # Desktop entry
+  # desktop entry
   install -Dm644 optiscaler-client.desktop \
     "$pkgdir/usr/share/applications/optiscaler-client.desktop"
 
-  # Icon (safe fallback search instead of hardcoded path)
-  ICON=""
-
-  for f in \
-    "$pkgdir/opt/optiscaler-client/assets/icon.png" \
-    "$pkgdir/opt/optiscaler-client/icon.png" \
-    "$pkgdir/opt/optiscaler-client/assets/icon.ico"
-  do
-    if [ -f "$f" ]; then
-      ICON="$f"
-      break
-    fi
-  done
-
-  if [ -n "$ICON" ]; then
-    install -Dm644 "$ICON" \
+  # icon (only if it actually exists)
+  if [ -f "$pkgdir/opt/optiscaler-client/assets/icon.png" ]; then
+    install -Dm644 \
+      "$pkgdir/opt/optiscaler-client/assets/icon.png" \
+      "$pkgdir/usr/share/pixmaps/optiscaler-client.png"
+  elif [ -f "$pkgdir/opt/optiscaler-client/icon.png" ]; then
+    install -Dm644 \
+      "$pkgdir/opt/optiscaler-client/icon.png" \
       "$pkgdir/usr/share/pixmaps/optiscaler-client.png"
   fi
 }
