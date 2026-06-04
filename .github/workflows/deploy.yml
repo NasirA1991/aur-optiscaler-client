@@ -18,11 +18,14 @@ jobs:
         run: |
           set -e
 
-          LATEST_VER=$(curl -s \
+          RAW_TAG=$(curl -s \
             https://api.github.com/repos/Agustinm28/OptiScaler-Client/releases/latest \
             | jq -r '.tag_name')
 
-          VERSION="${LATEST_VER#v}"
+          # Extract clean version (ONLY numbers + dots)
+          VERSION=$(echo "$RAW_TAG" | grep -oE '[0-9]+(\.[0-9]+)*')
+
+          echo "raw=$RAW_TAG"
           echo "latest=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Get current pkgver
