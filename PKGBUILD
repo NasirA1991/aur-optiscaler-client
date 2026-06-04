@@ -2,7 +2,7 @@
 
 pkgname=optiscaler-client-bin
 pkgver=1.0.5
-pkgrel=11
+pkgrel=12
 pkgdesc="Modern desktop client for installing, updating and configuring OptiScaler across game libraries"
 arch=('x86_64')
 url="https://github.com/Agustinm28/Optiscaler-Client"
@@ -42,4 +42,10 @@ EOF
 
   install -Dm644 "optiscaler-icon.png" \
     "$pkgdir/usr/share/icons/hicolor/scalable/apps/optiscaler-client.png"
+    
+  install -Dm644 "optiscaler-icon.png" \
+    "$pkgdir/usr/share/icons/hicolor/256x256/apps/optiscaler-client.png"
+
+  install -Dm644 "optiscaler-icon.png" \
+    "$pkgdir/usr/share/icons/hicolor/128x128/apps/optiscaler-client.png"
 }
