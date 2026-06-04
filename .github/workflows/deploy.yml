@@ -23,7 +23,6 @@ jobs:
             | jq -r '.tag_name')
 
           VERSION="${LATEST_VER#v}"
-
           echo "latest=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Get current pkgver
@@ -48,17 +47,15 @@ jobs:
             "s/^pkgver=.*/pkgver=${{ steps.latest.outputs.latest }}/" \
             PKGBUILD
 
-      - name: Regenerate .SRCINFO
+      - name: Install build tools
         if: steps.check.outputs.skip == 'false'
         run: |
-          docker run --rm \
-            -v "$PWD:/pkg" \
-            archlinux:latest \
-            bash -c '
-              pacman -Sy --noconfirm base-devel >/dev/null
-              cd /pkg
-              makepkg --printsrcinfo > .SRCINFO
-            '
+          sudo pacman -Sy --noconfirm base-devel
+
+      - name: Generate .SRCINFO
+        if: steps.check.outputs.skip == 'false'
+        run: |
+          makepkg --printsrcinfo > .SRCINFO
 
       - name: Deploy to AUR
         if: steps.check.outputs.skip == 'false'
