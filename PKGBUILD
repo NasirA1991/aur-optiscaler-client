@@ -16,7 +16,7 @@ conflicts=('optiscaler-client')
 options=(!strip)
 
 source=(
-  "optiscaler-client.zip::https://github.com/Agustinm28/Optiscaler-Client/releases/download/Optical>
+  "optiscaler-client.zip::https://github.com/Agustinm28/Optiscaler-Client/releases/download/OptiscalerClient-${pkgver}/OptiscalerClient-${pkgver}-linux-x64.zip"
   "optiscaler-icon-256.png::https://raw.githubusercontent.com/NasirA1991/aur-optiscaler-client/main/icon256.png"
   "optiscaler-icon-128.png::https://raw.githubusercontent.com/NasirA1991/aur-optiscaler-client/main/icon128.png"
   "optiscaler-client.desktop"
