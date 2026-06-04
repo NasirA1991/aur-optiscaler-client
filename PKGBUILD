@@ -21,7 +21,7 @@ source=(
   "optiscaler-client.desktop"
 )
 
-sha256sums=('SKIP' 'SKIP')
+sha256sums=('SKIP' 'SKIP' 'SKIP')
 
 package() {
   mkdir -p "$pkgdir/opt/optiscaler-client"
@@ -41,8 +41,5 @@ EOF
     "$pkgdir/usr/share/applications/optiscaler-client.desktop"
 
   install -Dm644 "optiscaler-icon.png" \
-    "$pkgdir/usr/share/icons/hicolor/256x256/apps/optiscaler-client.png"
-
-  install -Dm644 "optiscaler-icon.png" \
-    "$pkgdir/usr/share/icons/hicolor/128x128/apps/optiscaler-client.png"
+    "$pkgdir/usr/share/icons/hicolor/scalable/apps/optiscaler-client.png"
 }
