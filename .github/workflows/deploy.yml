@@ -13,8 +13,8 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Get latest release
-        id: release
+      - name: Get latest version
+        id: latest
         run: |
           set -e
 
@@ -24,46 +24,37 @@ jobs:
 
           VERSION=$(echo "$RAW_TAG" | grep -oE '[0-9]+(\.[0-9]+)*')
 
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "latest=$VERSION" >> $GITHUB_OUTPUT
 
-      - name: Check if update is needed
+      - name: Detect version mismatch
         id: check
         run: |
           set -e
 
           CURRENT=$(grep -Po '^pkgver=\K.*' PKGBUILD)
-          LATEST="${{ steps.release.outputs.version }}"
+          LATEST="${{ steps.latest.outputs.latest }}"
 
           echo "current=$CURRENT"
           echo "latest=$LATEST"
 
           if [ "$CURRENT" = "$LATEST" ]; then
             echo "update=false" >> $GITHUB_OUTPUT
-            exit 0
+          else
+            echo "update=true" >> $GITHUB_OUTPUT
           fi
 
-          echo "update=true" >> $GITHUB_OUTPUT
+      - name: Always allow manual override (IMPORTANT FIX)
+        if: github.event_name == 'workflow_dispatch'
+        run: echo "manual=true" >> $GITHUB_OUTPUT
+        id: manual
 
-      - name: Update PKGBUILD + SHA256
+      - name: Update PKGBUILD
         if: steps.check.outputs.update == 'true'
         run: |
-          set -e
-
-          VERSION="${{ steps.release.outputs.version }}"
-
-          sed -i "s/^pkgver=.*/pkgver=$VERSION/" PKGBUILD
+          sed -i "s/^pkgver=.*/pkgver=${{ steps.latest.outputs.latest }}/" PKGBUILD
           sed -i "s/^pkgrel=.*/pkgrel=1/" PKGBUILD
 
-          URL="https://github.com/Agustinm28/Optiscaler-Client/releases/download/OptiscalerClient-${VERSION}/OptiscalerClient-${VERSION}-linux-x64.zip"
-
-          curl -L -o optiscaler.zip "$URL"
-
-          SHA256=$(sha256sum optiscaler.zip | awk '{print $1}')
-
-          sed -i "s|^sha256sums=.*|sha256sums=('$SHA256' 'SKIP' 'SKIP' 'SKIP')|" PKGBUILD
-
       - name: Generate .SRCINFO
-        if: steps.check.outputs.update == 'true'
         run: |
           docker run --rm \
             -v "$PWD:/pkg" \
@@ -76,14 +67,8 @@ jobs:
               su builder -c 'cd /pkg && makepkg --printsrcinfo > .SRCINFO'
             "
 
-      - name: Clean workspace
-        if: steps.check.outputs.update == 'true'
-        run: |
-          rm -f optiscaler.zip || true
-          git clean -fdx
-
-      - name: Deploy to AUR
-        if: steps.check.outputs.update == 'true'
+      - name: Deploy to AUR (force on manual OR update)
+        if: steps.check.outputs.update == 'true' || github.event_name == 'workflow_dispatch'
         uses: KSXGitHub/github-actions-deploy-aur@v3
         with:
           pkgname: optiscaler-client-bin
@@ -91,9 +76,8 @@ jobs:
           assets: |
             PKGBUILD
             .SRCINFO
-            optiscaler-client.desktop
           SSH_PRIVATE_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
           commit_username: ${{ secrets.AUR_COMMIT_USERNAME }}
           commit_email: ${{ secrets.AUR_COMMIT_EMAIL }}
           updpkgsums: false
-          allow_empty_commits: false
+          allow_empty_commits: true
