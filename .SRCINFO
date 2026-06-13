@@ -9,10 +9,14 @@ pkgbase = optiscaler-client-bin
         depends = gcc-libs
         provides = optiscaler-client
         conflicts = optiscaler-client
-        source = optiscaler-client.tar.gz::https://github.com/Agustinm28/OptiScaler-Client/releases/download/v1.0.5/OptiscalerClient-1.0.5-linux-x64.tar.gz
+        options = !strip
+        source = optiscaler-client.zip::https://github.com/Agustinm28/Optiscaler-Client/releases/download/OptiscalerClient-1.0.5/OptiscalerClient-1.0.5-linux-x64.zip
+        source = optiscaler-icon-256.png::https://raw.githubusercontent.com/NasirA1991/aur-optiscaler-client/main/icon256.png
+        source = optiscaler-icon-128.png::https://raw.githubusercontent.com/NasirA1991/aur-optiscaler-client/main/icon128.png
         source = optiscaler-client.desktop
+        sha256sums = PLACEHOLDER
+        sha256sums = SKIP
         sha256sums = SKIP
         sha256sums = SKIP
 
 pkgname = optiscaler-client-bin
-
