@@ -55,7 +55,7 @@ jobs:
             echo "update=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Stop if nothing changed
+      - name: Skip if no update
         if: steps.check.outputs.update != 'true' && github.event_name != 'workflow_dispatch'
         run: echo "No update needed"
 
@@ -70,8 +70,9 @@ jobs:
           sed -i "s/^pkgver=.*/pkgver=${LATEST}/" PKGBUILD
           sed -i "s/^pkgrel=.*/pkgrel=1/" PKGBUILD
 
-          python3 << 'PYEOF'
+          python3 - <<EOF
 import os, re
+
 sha = os.environ['SHA']
 
 with open('PKGBUILD', 'r') as f:
@@ -89,9 +90,9 @@ with open('PKGBUILD', 'w') as f:
     f.write(content)
 
 print("Injected SHA:", sha)
-PYEOF
+EOF
 
-      - name: Generate .SRCINFO (FIXED)
+      - name: Generate .SRCINFO (safe)
         if: steps.check.outputs.update == 'true' || github.event_name == 'workflow_dispatch'
         run: |
           set -e
@@ -106,7 +107,7 @@ PYEOF
               su builder -c 'cd /pkg && makepkg --printsrcinfo > .SRCINFO'
             "
 
-      - name: Fix repo permissions (IMPORTANT FIX)
+      - name: Fix permissions (IMPORTANT)
         if: steps.check.outputs.update == 'true' || github.event_name == 'workflow_dispatch'
         run: sudo chown -R $(whoami):$(whoami) .
 
