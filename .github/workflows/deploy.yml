@@ -27,14 +27,13 @@ jobs:
 
           VERSION=$(echo "$RAW_TAG" | grep -oE '[0-9]+(\.[0-9]+)*')
 
-          # Download the release zip and compute its SHA256 so we can
-          # (a) verify integrity and (b) write it into the PKGBUILD.
           curl -L -s -o /tmp/release.zip \
             "https://github.com/Agustinm28/OptiScaler-Client/releases/download/OptiscalerClient-${VERSION}/OptiscalerClient-${VERSION}-linux-x64.zip"
+
           SHA=$(sha256sum /tmp/release.zip | awk '{print $1}')
 
           echo "latest=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "sha=$SHA"       >> "$GITHUB_OUTPUT"
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
 
       - name: Detect version or SHA mismatch
         id: check
@@ -56,13 +55,11 @@ jobs:
             echo "update=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Stop here if nothing changed (scheduled run, no update)
+      - name: Stop if nothing changed
         if: steps.check.outputs.update != 'true' && github.event_name != 'workflow_dispatch'
-        run: |
-          echo "No update detected and this is not a manual dispatch. Skipping everything."
-          echo "AUR will NOT be touched, so the package will NOT appear in 'recently updated'."
+        run: echo "No update needed"
 
-      - name: Update PKGBUILD (pkgver, pkgrel, sha256)
+      - name: Update PKGBUILD
         if: steps.check.outputs.update == 'true' || github.event_name == 'workflow_dispatch'
         env:
           LATEST: ${{ steps.latest.outputs.latest }}
@@ -73,31 +70,32 @@ jobs:
           sed -i "s/^pkgver=.*/pkgver=${LATEST}/" PKGBUILD
           sed -i "s/^pkgrel=.*/pkgrel=1/" PKGBUILD
 
-          # Replace only the FIRST sha256sums entry (the release zip) with
-          # the freshly computed SHA. Other entries are left untouched.
           python3 << 'PYEOF'
-          import os, re
-          sha = os.environ['SHA']
-          with open('PKGBUILD', 'r') as f:
-              content = f.read()
-          content, n = re.subn(
-              r"(sha256sums=\(')[^']*(')",
-              lambda m: m.group(1) + sha + m.group(2),
-              content,
-              count=1
-          )
-          assert n == 1, f"Expected to replace 1 sha256sums entry, replaced {n}"
-          with open('PKGBUILD', 'w') as f:
-              f.write(content)
-          print(f"Injected SHA256: {sha}")
-          PYEOF
+import os, re
+sha = os.environ['SHA']
 
-          echo "----- Updated PKGBUILD -----"
-          cat PKGBUILD
+with open('PKGBUILD', 'r') as f:
+    content = f.read()
 
-      - name: Generate .SRCINFO
+content, n = re.subn(
+    r"(sha256sums=\(')[^']*(')",
+    lambda m: m.group(1) + sha + m.group(2),
+    content,
+    count=1
+)
+
+assert n == 1
+with open('PKGBUILD', 'w') as f:
+    f.write(content)
+
+print("Injected SHA:", sha)
+PYEOF
+
+      - name: Generate .SRCINFO (FIXED)
         if: steps.check.outputs.update == 'true' || github.event_name == 'workflow_dispatch'
         run: |
+          set -e
+
           docker run --rm \
             -v "$PWD:/pkg" \
             -w /pkg \
@@ -105,18 +103,23 @@ jobs:
             bash -c "
               pacman -Sy --noconfirm base-devel >/dev/null
               useradd -m builder
-              chown -R builder:builder /pkg
               su builder -c 'cd /pkg && makepkg --printsrcinfo > .SRCINFO'
             "
 
-      - name: Commit updated PKGBUILD and .SRCINFO back to GitHub
+      - name: Fix repo permissions (IMPORTANT FIX)
+        if: steps.check.outputs.update == 'true' || github.event_name == 'workflow_dispatch'
+        run: sudo chown -R $(whoami):$(whoami) .
+
+      - name: Commit changes
         if: steps.check.outputs.update == 'true' || github.event_name == 'workflow_dispatch'
         run: |
-          git config user.name  "github-actions[bot]"
+          set -e
+          git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+
           git add PKGBUILD .SRCINFO
-          git commit -m "chore: bump to ${{ steps.latest.outputs.latest }}" || echo "Nothing to commit"
-          git push || echo "Nothing to push"
+          git commit -m "chore: bump to ${{ steps.latest.outputs.latest }}" || exit 0
+          git push
 
       - name: Deploy to AUR
         if: steps.check.outputs.update == 'true' || github.event_name == 'workflow_dispatch'
