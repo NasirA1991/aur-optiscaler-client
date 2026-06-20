@@ -5,6 +5,9 @@ on:
     - cron: '0 */6 * * *'
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -13,7 +16,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Get latest version
+      - name: Get latest version and compute SHA256
         id: latest
         run: |
           set -e
@@ -24,37 +27,76 @@ jobs:
 
           VERSION=$(echo "$RAW_TAG" | grep -oE '[0-9]+(\.[0-9]+)*')
 
-          echo "latest=$VERSION" >> $GITHUB_OUTPUT
+          # Download the release zip and compute its SHA256 so we can
+          # (a) verify integrity and (b) write it into the PKGBUILD.
+          curl -L -s -o /tmp/release.zip \
+            "https://github.com/Agustinm28/OptiScaler-Client/releases/download/OptiscalerClient-${VERSION}/OptiscalerClient-${VERSION}-linux-x64.zip"
+          SHA=$(sha256sum /tmp/release.zip | awk '{print $1}')
 
-      - name: Detect version mismatch
+          echo "latest=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "sha=$SHA"       >> "$GITHUB_OUTPUT"
+
+      - name: Detect version or SHA mismatch
         id: check
         run: |
           set -e
 
-          CURRENT=$(grep -Po '^pkgver=\K.*' PKGBUILD)
-          LATEST="${{ steps.latest.outputs.latest }}"
+          CURRENT_VER=$(grep -Po '^pkgver=\K.*' PKGBUILD)
+          CURRENT_SHA=$(grep -Po "^sha256sums=\('\K[^']*" PKGBUILD | head -n1)
 
-          echo "current=$CURRENT"
-          echo "latest=$LATEST"
+          LATEST_VER="${{ steps.latest.outputs.latest }}"
+          LATEST_SHA="${{ steps.latest.outputs.sha }}"
 
-          if [ "$CURRENT" = "$LATEST" ]; then
-            echo "update=false" >> $GITHUB_OUTPUT
+          echo "current_ver=$CURRENT_VER  latest_ver=$LATEST_VER"
+          echo "current_sha=$CURRENT_SHA  latest_sha=$LATEST_SHA"
+
+          if [ "$CURRENT_VER" != "$LATEST_VER" ] || [ "$CURRENT_SHA" != "$LATEST_SHA" ]; then
+            echo "update=true" >> "$GITHUB_OUTPUT"
           else
-            echo "update=true" >> $GITHUB_OUTPUT
+            echo "update=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Always allow manual override (IMPORTANT FIX)
-        if: github.event_name == 'workflow_dispatch'
-        run: echo "manual=true" >> $GITHUB_OUTPUT
-        id: manual
-
-      - name: Update PKGBUILD
-        if: steps.check.outputs.update == 'true'
+      - name: Stop here if nothing changed (scheduled run, no update)
+        if: steps.check.outputs.update != 'true' && github.event_name != 'workflow_dispatch'
         run: |
-          sed -i "s/^pkgver=.*/pkgver=${{ steps.latest.outputs.latest }}/" PKGBUILD
+          echo "No update detected and this is not a manual dispatch. Skipping everything."
+          echo "AUR will NOT be touched, so the package will NOT appear in 'recently updated'."
+
+      - name: Update PKGBUILD (pkgver, pkgrel, sha256)
+        if: steps.check.outputs.update == 'true' || github.event_name == 'workflow_dispatch'
+        env:
+          LATEST: ${{ steps.latest.outputs.latest }}
+          SHA: ${{ steps.latest.outputs.sha }}
+        run: |
+          set -e
+
+          sed -i "s/^pkgver=.*/pkgver=${LATEST}/" PKGBUILD
           sed -i "s/^pkgrel=.*/pkgrel=1/" PKGBUILD
 
+          # Replace only the FIRST sha256sums entry (the release zip) with
+          # the freshly computed SHA. Other entries are left untouched.
+          python3 << 'PYEOF'
+          import os, re
+          sha = os.environ['SHA']
+          with open('PKGBUILD', 'r') as f:
+              content = f.read()
+          content, n = re.subn(
+              r"(sha256sums=\(')[^']*(')",
+              lambda m: m.group(1) + sha + m.group(2),
+              content,
+              count=1
+          )
+          assert n == 1, f"Expected to replace 1 sha256sums entry, replaced {n}"
+          with open('PKGBUILD', 'w') as f:
+              f.write(content)
+          print(f"Injected SHA256: {sha}")
+          PYEOF
+
+          echo "----- Updated PKGBUILD -----"
+          cat PKGBUILD
+
       - name: Generate .SRCINFO
+        if: steps.check.outputs.update == 'true' || github.event_name == 'workflow_dispatch'
         run: |
           docker run --rm \
             -v "$PWD:/pkg" \
@@ -67,7 +109,16 @@ jobs:
               su builder -c 'cd /pkg && makepkg --printsrcinfo > .SRCINFO'
             "
 
-      - name: Deploy to AUR (force on manual OR update)
+      - name: Commit updated PKGBUILD and .SRCINFO back to GitHub
+        if: steps.check.outputs.update == 'true' || github.event_name == 'workflow_dispatch'
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add PKGBUILD .SRCINFO
+          git commit -m "chore: bump to ${{ steps.latest.outputs.latest }}" || echo "Nothing to commit"
+          git push || echo "Nothing to push"
+
+      - name: Deploy to AUR
         if: steps.check.outputs.update == 'true' || github.event_name == 'workflow_dispatch'
         uses: KSXGitHub/github-actions-deploy-aur@v3
         with:
@@ -76,6 +127,7 @@ jobs:
           assets: |
             PKGBUILD
             .SRCINFO
+            optiscaler-client.desktop
           SSH_PRIVATE_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
           commit_username: ${{ secrets.AUR_COMMIT_USERNAME }}
           commit_email: ${{ secrets.AUR_COMMIT_EMAIL }}
