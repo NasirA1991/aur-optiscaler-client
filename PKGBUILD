@@ -1,4 +1,4 @@
-# Maintainer: Evilleader <evilleader91@gmail.com>
+# Maintainer: Evilleader evilleader91@gmail.com
 
 pkgname=optiscaler-client-bin
 pkgver=1.0.5
@@ -16,21 +16,21 @@ conflicts=('optiscaler-client')
 options=(!strip)
 
 source=(
-  "optiscaler-client.zip::https://github.com/Agustinm28/OptiScaler-Client/releases/download/OptiscalerClient-${pkgver}/OptiscalerClient-${pkgver}-linux-x64.zip"
+  "optiscaler-client.zip::https://github.com/Agustinm28/Optiscaler-Client/releases/download/OptiscalerClient-${pkgver}/OptiscalerClient-${pkgver}-linux-x64.zip"
   "optiscaler-icon-256.png::https://raw.githubusercontent.com/NasirA1991/aur-optiscaler-client/main/icon256.png"
   "optiscaler-icon-128.png::https://raw.githubusercontent.com/NasirA1991/aur-optiscaler-client/main/icon128.png"
   "optiscaler-client.desktop"
 )
 
-# The first SHA256 (the release zip) is computed and injected automatically
-# by the CI workflow on every new release. The icons and the .desktop file
-# are auxiliary static assets and intentionally left as SKIP. If you want
-# full integrity verification for them too, replace the SKIPs with the
-# actual checksums (run `makepkg -g` locally once).
+# These are placeholders only. They are overwritten automatically every
+# deploy by `updpkgsums: true` in deploy.yml (KSXGitHub/github-actions-deploy-aur).
+# Do NOT use 'SKIP' here -- 'SKIP' tells updpkgsums to leave that entry
+# untouched, which is exactly the "skipped verification" behavior that got
+# flagged. Any non-SKIP placeholder works since it's always replaced.
 sha256sums=('PLACEHOLDER'
-            'SKIP'
-            'SKIP'
-            'SKIP')
+            'PLACEHOLDER'
+            'PLACEHOLDER'
+            'PLACEHOLDER')
 
 package() {
   mkdir -p "$pkgdir/opt/optiscaler-client"
