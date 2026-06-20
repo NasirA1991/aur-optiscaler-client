@@ -88,6 +88,15 @@ jobs:
           assets: |
             optiscaler-client.desktop
           updpkgsums: true
+          # updpkgsums downloads the sources (incl. the ~57MB zip) into the
+          # AUR repo's working tree to compute their hashes, and leaves them
+          # there. Because `assets` is set above, the action stages files
+          # with `git add --all` rather than adding PKGBUILD/.SRCINFO
+          # individually -- which sweeps those leftover downloads into the
+          # commit too. AUR's push hook rejects any blob over ~488KiB, which
+          # is exactly what happened. Delete them here, before the commit step.
+          post_process: |
+            rm -fv optiscaler-client.zip optiscaler-icon-256.png optiscaler-icon-128.png
           ssh_private_key: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
           commit_username: ${{ secrets.AUR_COMMIT_USERNAME }}
           commit_email: ${{ secrets.AUR_COMMIT_EMAIL }}
