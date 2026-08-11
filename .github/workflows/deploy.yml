@@ -1,70 +1,63 @@
 name: Deploy to AUR
-
 on:
   schedule:
     - cron: '0 */6 * * *'
   workflow_dispatch:
-
 permissions:
   contents: write   # needed to commit the version bump back to this repo
-
 concurrency:
   group: deploy-to-aur
   cancel-in-progress: false
-
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
       - name: Get latest version
         id: latest
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -e
-
-          RAW_TAG=$(curl -sf \
+          set -o pipefail
+          # Repo moved from Agustinm28/OptiScaler-Client to the
+          # Optiscaler-Client org -- pointing at the new canonical path
+          # directly instead of relying on GitHub's redirect.
+          JSON=$(curl -sfL \
             -H "Authorization: Bearer $GH_TOKEN" \
-            https://api.github.com/repos/Agustinm28/OptiScaler-Client/releases/latest \
-            | jq -r '.tag_name')
-
-          VERSION=$(echo "$RAW_TAG" | grep -oE '[0-9]+(\.[0-9]+)*')
-
-          if [ -z "$VERSION" ]; then
-            echo "Could not determine latest version, aborting." >&2
+            https://api.github.com/repos/Optiscaler-Client/Optiscaler-Client/releases/latest)
+          RAW_TAG=$(echo "$JSON" | jq -r '.tag_name')
+          if [ -z "$RAW_TAG" ] || [ "$RAW_TAG" = "null" ]; then
+            echo "Could not fetch latest release tag. API response was:" >&2
+            echo "$JSON" >&2
             exit 1
           fi
-
+          VERSION=$(echo "$RAW_TAG" | grep -oE '[0-9]+(\.[0-9]+)*')
+          if [ -z "$VERSION" ]; then
+            echo "Could not extract a version number from tag: $RAW_TAG" >&2
+            exit 1
+          fi
           echo "latest=$VERSION" >> "$GITHUB_OUTPUT"
-
       - name: Detect version mismatch
         id: check
         run: |
           set -e
-
           CURRENT=$(grep -Po '^pkgver=\K.*' PKGBUILD)
           LATEST="${{ steps.latest.outputs.latest }}"
-
           echo "current=$CURRENT"
           echo "latest=$LATEST"
-
           if [ "$CURRENT" = "$LATEST" ]; then
             echo "update=false" >> "$GITHUB_OUTPUT"
           else
             echo "update=true" >> "$GITHUB_OUTPUT"
           fi
-
       - name: Bump PKGBUILD version
         if: steps.check.outputs.update == 'true'
         run: |
           set -e
           sed -i "s/^pkgver=.*/pkgver=${{ steps.latest.outputs.latest }}/" PKGBUILD
           sed -i "s/^pkgrel=.*/pkgrel=1/" PKGBUILD
-
       # This is the missing piece that caused the "always pushes" loop:
       # without committing the bump back to THIS repo, next run's
       # "Detect version mismatch" step keeps comparing against the old
@@ -77,8 +70,8 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add PKGBUILD
           git commit -m "Bump pkgver to ${{ steps.latest.outputs.latest }}"
+          git pull --rebase origin main
           git push
-
       - name: Deploy to AUR
         if: steps.check.outputs.update == 'true' || github.event_name == 'workflow_dispatch'
         uses: KSXGitHub/github-actions-deploy-aur@v4.1.3
