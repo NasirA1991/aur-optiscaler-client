@@ -89,7 +89,7 @@ jobs:
           # commit too. AUR's push hook rejects any blob over ~488KiB, which
           # is exactly what happened. Delete them here, before the commit step.
           post_process: |
-            rm -fv optiscaler-client.zip optiscaler-icon-256.png optiscaler-icon-128.png
+            rm -fv optiscaler-client.zip optiscaler-client.png
           ssh_private_key: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
           commit_username: ${{ secrets.AUR_COMMIT_USERNAME }}
           commit_email: ${{ secrets.AUR_COMMIT_EMAIL }}
