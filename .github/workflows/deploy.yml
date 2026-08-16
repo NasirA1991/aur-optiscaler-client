@@ -88,8 +88,14 @@ jobs:
           # individually -- which sweeps those leftover downloads into the
           # commit too. AUR's push hook rejects any blob over ~488KiB, which
           # is exactly what happened. Delete them here, before the commit step.
+          #
+          # Filenames are now version-suffixed (optiscaler-client-${pkgver}.zip
+          # / .png) so AUR helpers never reuse a stale cached file from a
+          # previous pkgver -- that mismatch was exactly what caused the
+          # "sha256sums ... FAILED" report on the 1.0.5 -> 1.0.6 upgrade.
+          # Glob here so cleanup keeps matching regardless of pkgver.
           post_process: |
-            rm -fv optiscaler-client.zip optiscaler-client.png
+            rm -fv optiscaler-client-*.zip optiscaler-client-*.png
           ssh_private_key: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
           commit_username: ${{ secrets.AUR_COMMIT_USERNAME }}
           commit_email: ${{ secrets.AUR_COMMIT_EMAIL }}
