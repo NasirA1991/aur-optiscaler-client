@@ -1,7 +1,7 @@
 # Maintainer: Evilleader evilleader91@gmail.com
 pkgname=optiscaler-client-bin
-pkgver=1.0.6
-pkgrel=4
+pkgver=1.0.6.1
+pkgrel=1
 pkgdesc="A modern manager for OptiScaler"
 arch=('x86_64')
 url="https://github.com/Optiscaler-Client/Optiscaler-Client"
