@@ -1,6 +1,6 @@
 # Maintainer: Evilleader evilleader91@gmail.com
 pkgname=optiscaler-client-bin
-pkgver=1.0.7
+pkgver=1.0.7.1
 pkgrel=1
 pkgdesc="A modern manager for OptiScaler"
 arch=('x86_64')
